@@ -8,7 +8,7 @@ ldflags = commands.getoutput('pkg-config --libs lognorm').strip().split()
 
 setup(
     name = "liblognorm",
-    version = "0.0.0",
+    version = "0.1.0",
     description = "fast log normalization library",
     ext_modules = [
         Extension(
