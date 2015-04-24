@@ -3,8 +3,7 @@
 #include <Python.h>
 #include <string.h>
 #include <liblognorm.h>
-
-#include <stdio.h>
+#include <errno.h>
 
 //----------------------------------------------------------------------------
 
@@ -38,8 +37,27 @@ int obj_init(ObjectInstance *self, PyObject *args, PyObject *kwargs)
     return -1;
 
   self->lognorm_context = ln_initCtx();
-  ln_loadSamples(self->lognorm_context, rulebase);
-  // TODO: check for errors
+  int result = ln_loadSamples(self->lognorm_context, rulebase);
+  if (result != 0) {
+    switch (result) {
+      case LN_NOMEM:
+        PyErr_NoMemory();
+      break;
+      case LN_BADCONFIG:
+        PyErr_SetString(PyExc_ValueError, "bad configuration file");
+      break;
+      case LN_BADPARSERSTATE:
+        PyErr_SetString(PyExc_RuntimeError, "bad parser state");
+      break;
+      case LN_WRONGPARSER:
+        PyErr_SetString(PyExc_RuntimeError, "wrong parser");
+      break;
+      default:
+        PyErr_SetFromErrno(PyExc_OSError);
+      break;
+    }
+    return -1;
+  }
 
   return 0;
 }
@@ -94,26 +112,30 @@ PyObject* normalize(ObjectInstance *self, PyObject *args, PyObject *kwargs)
   // }}}
   //-------------------------------------------------------
 
-  PyObject *result = NULL;
-
   struct json_object *log = NULL;
   int norm_result = ln_normalize(self->lognorm_context, log_entry,
                                  log_entry_length, &log);
-  if (norm_result == 0) {
-    // log != NULL here
-    result = convert_object(log);
-  } else {
-    fprintf(stderr, "some kind of error (%d)\n", norm_result);
+  if (norm_result != 0) {
+    // TODO: report whatever was in `log' object
+    if (log != NULL)
+      json_object_put(log); // free the JSON object
+
+    PyErr_SetString(PyExc_RuntimeError, "error while normalizing log line");
+    return NULL;
   }
 
-  if (log != NULL)
-    // yes, this is how is called the function freeing memory for the object
-    json_object_put(log);
+  // XXX: log != NULL here
+
+  PyObject *result = convert_object(log);
+  json_object_put(log); // free the JSON object
 
   return result;
 }
 
 //----------------------------------------------------------------------------
+// data conversion: json-c -> Python {{{
+
+// FIXME: memory checking for all these functions
 
 static PyObject* convert_scalar(json_object *obj);
 static PyObject* convert_list(json_object *obj);
@@ -204,6 +226,9 @@ PyObject* convert_hash(json_object *obj)
 
   return result;
 }
+
+// }}}
+//----------------------------------------------------------------------------
 
 //----------------------------------------------------------------------------
 // Python module administrative stuff
