@@ -32,8 +32,7 @@ int obj_init(ObjectInstance *self, PyObject *args, PyObject *kwargs)
 
   static char *kwlist[] = {"rules", NULL};
 
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s", kwlist, 
-                                   &rulebase))
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s", kwlist, &rulebase))
     return -1;
 
   self->lognorm_context = ln_initCtx();
@@ -65,7 +64,8 @@ int obj_init(ObjectInstance *self, PyObject *args, PyObject *kwargs)
 static
 void obj_dealloc(ObjectInstance *self)
 {
-  ln_exitCtx(self->lognorm_context);
+  if (self->lognorm_context != NULL)
+    ln_exitCtx(self->lognorm_context);
   self->ob_type->tp_free((PyObject *)self);
 }
 
