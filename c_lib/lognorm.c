@@ -54,6 +54,8 @@ void obj_dealloc(ObjectInstance *self)
 // }}}
 //----------------------------------------------------------------------------
 
+static PyObject* convert_object(json_object *obj);
+
 // result = lognorm.normalize(log = "...", strip = True)
 static
 PyObject* normalize(ObjectInstance *self, PyObject *args, PyObject *kwargs)
@@ -92,25 +94,116 @@ PyObject* normalize(ObjectInstance *self, PyObject *args, PyObject *kwargs)
   // }}}
   //-------------------------------------------------------
 
+  PyObject *result = NULL;
+
   struct json_object *log = NULL;
-  int result = ln_normalize(self->lognorm_context, log_entry,
-                            log_entry_length, &log);
-  if (result == 0) {
+  int norm_result = ln_normalize(self->lognorm_context, log_entry,
+                                 log_entry_length, &log);
+  if (norm_result == 0) {
     // log != NULL here
-    fprintf(stdout, "> %s\n", json_object_to_json_string(log));
+    result = convert_object(log);
   } else {
-    fprintf(stderr, "some kind of error (%d)\n", result);
+    fprintf(stderr, "some kind of error (%d)\n", norm_result);
   }
 
   if (log != NULL)
     // yes, this is how is called the function freeing memory for the object
     json_object_put(log);
 
-  Py_INCREF(Py_None);
-  return Py_None;
+  return result;
 }
 
 //----------------------------------------------------------------------------
+
+static PyObject* convert_scalar(json_object *obj);
+static PyObject* convert_list(json_object *obj);
+static PyObject* convert_hash(json_object *obj);
+
+static
+PyObject* convert_object(json_object *obj)
+{
+  switch (json_object_get_type(obj)) {
+    case json_type_null:
+    case json_type_boolean:
+    case json_type_double:
+    case json_type_int:
+    case json_type_string:
+      return convert_scalar(obj);
+    break;
+    case json_type_object:
+      return convert_hash(obj);
+    break;
+    case json_type_array:
+      return convert_list(obj);
+    break;
+  }
+  // XXX: never reached
+  return NULL;
+}
+
+static
+PyObject* convert_scalar(json_object *obj)
+{
+  switch (json_object_get_type(obj)) {
+    case json_type_null:
+      Py_INCREF(Py_None);
+      return Py_None;
+    break;
+    case json_type_boolean:
+      if (json_object_get_boolean(obj)) {
+        Py_INCREF(Py_True);
+        return Py_True;
+      } else {
+        Py_INCREF(Py_False);
+        return Py_False;
+      }
+    break;
+    case json_type_double:
+      return Py_BuildValue("d", json_object_get_double(obj));
+    break;
+    case json_type_int:
+      return Py_BuildValue("l", json_object_get_int64(obj));
+    break;
+    case json_type_string:
+      return Py_BuildValue("s", json_object_get_string(obj));
+    break;
+    default:
+      // XXX: impossible, only for silencing warnings
+      return NULL;
+    break;
+  }
+}
+
+static
+PyObject* convert_list(json_object *obj)
+{
+  PyObject *result = Py_BuildValue("[]");
+
+  int array_length = json_object_array_length(obj);
+  int i;
+  for (i = 0; i < array_length; ++i) {
+    PyObject *item = convert_object(json_object_array_get_idx(obj, i));
+    PyList_Append(result, item);
+    Py_DECREF(item);
+  }
+
+  return result;
+}
+
+static
+PyObject* convert_hash(json_object *obj)
+{
+  PyObject *result = Py_BuildValue("{}");
+  json_object_iter iter;
+
+  json_object_object_foreachC(obj, iter) {
+    PyObject *value = convert_object(iter.val);
+    PyDict_SetItemString(result, iter.key, value);
+    Py_DECREF(value);
+  }
+
+  return result;
+}
 
 //----------------------------------------------------------------------------
 // Python module administrative stuff
