@@ -15,6 +15,14 @@
 
 //----------------------------------------------------------------------------
 
+static
+PyObject* liblognorm_version(PyObject *self, PyObject *args)
+{
+  return Py_BuildValue("s", ln_version());
+}
+
+//----------------------------------------------------------------------------
+
 // struct for object instance
 typedef struct {
   PyObject_HEAD
@@ -240,6 +248,8 @@ static
 PyMethodDef object_methods[] = {
   {"normalize", (PyCFunction)normalize, METH_VARARGS | METH_KEYWORDS,
     "parse log line to dict object"},
+  {"version", (PyCFunction)liblognorm_version, METH_VARARGS,
+    "return liblognorm's version"},
   {NULL}  /* sentinel */
 };
 

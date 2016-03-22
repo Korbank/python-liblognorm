@@ -15,6 +15,8 @@ Usage
     import sys
     import json
 
+    print liblognorm.version() # version liblognorm (not the binding module)
+
     rulebase = "parsing.rules"
     lognorm = liblognorm.Lognorm(rulebase)
     log_line = sys.stdin.readline()
