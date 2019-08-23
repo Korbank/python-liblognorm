@@ -1,10 +1,14 @@
 #!/usr/bin/python
 
 from setuptools import setup, find_packages, Extension
-import commands
+import sys
+if sys.version_info >= (3,):
+  import subprocess
+else:
+  import commands as subprocess
 
-cflags = commands.getoutput('pkg-config --cflags lognorm').strip().split()
-ldflags = commands.getoutput('pkg-config --libs lognorm').strip().split()
+cflags = subprocess.getoutput('pkg-config --cflags lognorm').strip().split()
+ldflags = subprocess.getoutput('pkg-config --libs lognorm').strip().split()
 
 setup(
     name = "liblognorm",
