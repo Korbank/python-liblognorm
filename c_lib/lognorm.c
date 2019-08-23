@@ -224,12 +224,14 @@ static
 PyObject* convert_hash(json_object *obj)
 {
   PyObject *result = Py_BuildValue("{}");
-  json_object_iter iter;
+  struct json_object_iterator it = json_object_iter_begin(obj);
+  struct json_object_iterator itEnd = json_object_iter_end(obj);
 
-  json_object_object_foreachC(obj, iter) {
-    PyObject *value = convert_object(iter.val);
-    PyDict_SetItemString(result, iter.key, value);
+  while (!json_object_iter_equal(&it, &itEnd)) {
+    PyObject *value = convert_object(json_object_iter_peek_value(&it));
+    PyDict_SetItemString(result, json_object_iter_peek_name(&it), value);
     Py_DECREF(value);
+    json_object_iter_next(&it);
   }
 
   return result;
