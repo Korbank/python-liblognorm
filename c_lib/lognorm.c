@@ -74,7 +74,7 @@ void obj_dealloc(ObjectInstance *self)
 {
   if (self->lognorm_context != NULL)
     ln_exitCtx(self->lognorm_context);
-  self->ob_type->tp_free((PyObject *)self);
+  Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
 // }}}
@@ -224,12 +224,14 @@ static
 PyObject* convert_hash(json_object *obj)
 {
   PyObject *result = Py_BuildValue("{}");
-  json_object_iter iter;
+  struct json_object_iterator it = json_object_iter_begin(obj);
+  struct json_object_iterator itEnd = json_object_iter_end(obj);
 
-  json_object_object_foreachC(obj, iter) {
-    PyObject *value = convert_object(iter.val);
-    PyDict_SetItemString(result, iter.key, value);
+  while (!json_object_iter_equal(&it, &itEnd)) {
+    PyObject *value = convert_object(json_object_iter_peek_value(&it));
+    PyDict_SetItemString(result, json_object_iter_peek_name(&it), value);
     Py_DECREF(value);
+    json_object_iter_next(&it);
   }
 
   return result;
@@ -256,8 +258,7 @@ PyMethodDef object_methods[] = {
 // struct for object instance's class
 static
 PyTypeObject TypeObject = {
-  PyObject_HEAD_INIT(NULL)
-  0,                         /* ob_size           */
+  PyVarObject_HEAD_INIT(NULL, 0)
   MODULE_NAME "." TYPE_NAME, /* tp_name           */
   sizeof(ObjectInstance),    /* tp_basicsize      */
   0,                         /* tp_itemsize       */
@@ -299,23 +300,47 @@ PyTypeObject TypeObject = {
 //----------------------------------------------------------------------------
 // module initializer {{{
 
-#ifndef PyMODINIT_FUNC	/* declarations for DLL import/export */
-#define PyMODINIT_FUNC void
+#if PY_MAJOR_VERSION >= 3
+static struct PyModuleDef moduledef = {
+    PyModuleDef_HEAD_INIT,
+    MODULE_NAME,         /* m_name */
+    MODULE_DOCSTRING,    /* m_doc */
+    -1,                  /* m_size */
+    object_methods,      /* m_methods */
+    NULL,                /* m_reload */
+    NULL,                /* m_traverse */
+    NULL,                /* m_clear */
+    NULL,                /* m_free */
+};
 #endif
 
-// XXX: module entry point needs to have "initliblognorm" name
-PyMODINIT_FUNC initliblognorm(void) 
+#if PY_MAJOR_VERSION >= 3
+PyMODINIT_FUNC PyInit_liblognorm(void)
+#else
+PyMODINIT_FUNC initliblognorm(void)
+#endif
 {
   PyObject* module;
 
   TypeObject.tp_new = PyType_GenericNew;
   if (PyType_Ready(&TypeObject) < 0)
+#if PY_MAJOR_VERSION >= 3
+    return NULL;
+#else
     return;
+#endif
 
+#if PY_MAJOR_VERSION >= 3
+  module = PyModule_Create(&moduledef);
+#else
   module = Py_InitModule3(MODULE_NAME, object_methods, MODULE_DOCSTRING);
+#endif
 
   Py_INCREF(&TypeObject);
   PyModule_AddObject(module, TYPE_NAME, (PyObject *)&TypeObject);
+#if PY_MAJOR_VERSION >= 3
+  return module;
+#endif
 }
 
 // }}}

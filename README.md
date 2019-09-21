@@ -6,7 +6,7 @@ capable of real-time processing. It can convert logs from flat string-blob
 format to one of several standard formats (e.g. [CEE](https://cee.mitre.org/)
 or JSON).
 
-This is a Python bindings for liblognorm 1.1.x.
+This is a Python binding for liblognorm 2.0.x.
 
 Usage
 -----
@@ -15,13 +15,13 @@ Usage
     import sys
     import json
 
-    print liblognorm.version() # version liblognorm (not the binding module)
+    print(liblognorm.version()) # version liblognorm (not the binding module)
 
     rulebase = "parsing.rules"
     lognorm = liblognorm.Lognorm(rulebase)
     log_line = sys.stdin.readline()
     event = lognorm.normalize(log_line.rstrip("\n"))
-    print json.dumps(event)
+    print(json.dumps(event))
 
 
 Contact and License
